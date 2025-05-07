@@ -10,13 +10,15 @@ class AuthToken
 {
     public function handle(Request $request, Closure $next)
     {
-        $token = $request->header('Authorization');
+        $token = $request->bearerToken(); 
 
         if (!$token || !User::where('api_token', $token)->exists()) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        return $next($request);
+        $user = User::where('api_token', $token)->first();
+        $request->merge(['user' => $user]); 
+        return $next($request); 
     }
 }
 

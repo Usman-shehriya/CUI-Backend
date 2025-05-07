@@ -9,35 +9,44 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use App\Rules\ValidComsatsRollNumber;
 
 
 class UserController extends Controller
 {
+
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|unique:users',
-            'password' => 'required|string|min:6',
-            'role'     => 'required|in:freelancer,client',
+            'name'        => 'required|string|max:255',
+            'email'       => 'required|string|email|unique:users',
+            'password'    => 'required|string|min:6',
+            'role'        => 'required|in:freelancer,client',
+            'roll_number' => [
+                'required_if:role,freelancer',
+                'nullable',
+                new ValidComsatsRollNumber
+            ],
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => $request->role,
+            'name'        => $request->name,
+            'email'       => $request->email,
+            'password'    => Hash::make($request->password),
+            'role'        => $request->role,
+            'roll_number' => $request->role === 'freelancer' ? $request->roll_number : null,
         ]);
 
         return response()->json([
             'message' => 'User registered successfully',
-            'user' => $user
+            'user'    => $user,
         ], 201);
     }
+
    
     public function login(Request $request)
     {
@@ -52,7 +61,7 @@ class UserController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        // Generate a manual token
+
         $token = Str::random(60);
         $user->api_token = $token;
         $user->save();
@@ -64,7 +73,37 @@ class UserController extends Controller
         ]);
     }
 
-   
+    public function dashboard()
+    {
+        return response()->json(['message' => 'Welcome to the dashboard!']);
+    }
+
+    public function getUser(Request $request)
+    {
+        $token = $request->bearerToken();
+        $user = User::where('api_token', $token)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        return response()->json(['user' => $user]);
+    }
+
+    public function logout(Request $request)
+    {
+        $token = $request->bearerToken();
+
+        $user = User::where('api_token', $token)->first();
+
+        if ($user) {
+
+            $user->api_token = null;
+            $user->save();
+        }
+
+        return response()->json(['message' => 'Logged out']);
+    }
 
 }
 
